@@ -117,6 +117,7 @@ class PipelineSettings:
     exports_dir: str = "./output/exports"
     log_level: str = "INFO"
     log_file: Optional[str] = None
+    json_log_file: Optional[str] = "./output/logs/execution.jsonl"
     run_date: date = field(default_factory=lambda: datetime.today().date())
 
     def resolve_paths(self) -> None:
@@ -229,15 +230,12 @@ class PipelineSettings:
             self.exports_dir = os.path.join(local_out, "exports")
         else:
             if self.silver_s3_root:
-                self.silver_output_dir = os.path.join(
-                    self.silver_s3_root,
-                    f"Zone={self.zone}",
-                    f"Phase={self.phase}",
-                    f"Cycle={self.cycle}",
-                    f"UPC={self.upc}",
-                    "dlm_kpi_new",
-                )
-            if self.work_dir:
+                upc_partition = f"Zone={self.zone}/Phase={self.phase}/Cycle={self.cycle}/UPC={self.upc}"
+                self.silver_output_dir = f"{self.silver_s3_root.rstrip('/')}/{upc_partition}/dlm_kpi_new"
+                # Validation results saved in s3://dhms-new-stgae/DHMS/NSV/Silver/Zone=<Z>/Phase=<P>/Cycle=<C>/UPC=<UPC>
+                self.validation_report_dir = f"{self.silver_s3_root.rstrip('/')}/{upc_partition}"
+                self.exports_dir = f"{self.silver_s3_root.rstrip('/')}/{upc_partition}/exports"
+            elif self.work_dir:
                 self.validation_report_dir = os.path.join(self.work_dir, "validation_reports")
                 self.exports_dir = os.path.join(self.work_dir, "exports")
 
@@ -275,6 +273,7 @@ class PipelineSettings:
             image_upload_base_url=env.get("IMAGE_UPLOAD_BASE_URL", "https://nhaidhms-stage-api.dic.org.in"),
             log_level=env.get("LOG_LEVEL", "INFO"),
             log_file=env.get("LOG_FILE", None),
+            json_log_file=env.get("JSON_LOG_FILE", "./output/logs/execution.jsonl"),
         )
         settings.resolve_paths()
         return settings

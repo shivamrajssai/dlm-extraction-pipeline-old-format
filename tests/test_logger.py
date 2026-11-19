@@ -45,6 +45,27 @@ class TestLogger(unittest.TestCase):
             if os.path.exists(tmp_path):
                 os.remove(tmp_path)
 
+    def test_json_lines_logging(self):
+        with tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False) as tmp:
+            tmp_path = tmp.name
+
+        try:
+            import json
+            test_logger = setup_logger("test_json", log_level=logging.INFO, json_log_file=tmp_path)
+            test_logger.info("Structured event test")
+
+            with open(tmp_path, "r", encoding="utf-8") as f:
+                lines = [json.loads(line) for line in f if line.strip()]
+
+            self.assertGreaterEqual(len(lines), 1)
+            event = lines[0]
+            self.assertEqual(event["level"], "INFO")
+            self.assertEqual(event["activity"], "Structured event test")
+            self.assertIn("timestamp", event)
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+
 
 if __name__ == "__main__":
     unittest.main()

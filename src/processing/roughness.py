@@ -62,6 +62,7 @@ def build_roughness_linear_set(
     run_date: date,
     ca_bi_threshold: float,
     irc_iri_threshold: float,
+    ca_interval_m: Optional[int] = None,
     columns: Optional[List[str]] = None,
 ) -> Dict[str, pd.DataFrame]:
     """
@@ -140,10 +141,11 @@ def build_roughness_linear_set(
             child_10m_rows.append(sub)
     child_10m_pdf = pd.DataFrame(child_10m_rows)
 
-    # 3. Child 100m Aggregation
+    # 3. Child CA (mid-level) Aggregation
+    ca_iv_m = int(ca_interval_m) if ca_interval_m is not None else get_reporting_interval(tracker_ctx, "roughness")
     c100 = norm_pdf.copy()
-    c100["bin_start"] = (c100["start_chainage"] // CHILD_100M) * CHILD_100M
-    c100["bin_end"] = c100["bin_start"] + CHILD_100M
+    c100["bin_start"] = (c100["start_chainage"] // ca_iv_m) * ca_iv_m
+    c100["bin_end"] = c100["bin_start"] + ca_iv_m
     gk100 = ["lane", "bin_start", "bin_end"]
     agg_dict = {
         "survey_date": "first", "start_lat": "first", "start_long": "first",
@@ -160,17 +162,21 @@ def build_roughness_linear_set(
     c100_agg.loc[valid100, "roughness_bi"] = 630.0 * (avg_iri_100 ** 1.12)
     c100_agg.loc[valid100, "metric_value"] = c100_agg.loc[valid100, "roughness_bi"]
 
-    # 4. Parent 1000m Aggregation
-    c1k = norm_pdf.copy()
+    # 4. Parent 1000m Aggregation (average of 100m CA roughness_bi values per lane)
+    c1k = c100_agg.copy()
     c1k["parent_start_chainage"] = (c1k["start_chainage"] // PARENT_LENGTH_M) * PARENT_LENGTH_M
     c1k["parent_end_chainage"] = c1k["parent_start_chainage"] + PARENT_LENGTH_M
     gk1k = ["lane", "parent_start_chainage", "parent_end_chainage"]
-    c1k_agg = c1k.groupby(gk1k, dropna=False).agg(agg_dict).reset_index().rename(columns={"row_id": "segment_count"})
-    valid1k = c1k_agg["lwp_iri"].notna() & c1k_agg["rwp_iri"].notna()
-    avg_iri_1k = (c1k_agg.loc[valid1k, "lwp_iri"] + c1k_agg.loc[valid1k, "rwp_iri"]) / 2
-    c1k_agg.loc[valid1k, "iri_value"] = avg_iri_1k
-    c1k_agg.loc[valid1k, "roughness_bi"] = 630.0 * (avg_iri_1k ** 1.12)
-    c1k_agg.loc[valid1k, "metric_value"] = c1k_agg.loc[valid1k, "roughness_bi"]
+    agg_dict_parent = {
+        "survey_date": "first", "start_lat": "first", "start_long": "first",
+        "end_lat": "last", "end_long": "last", "length_m": "sum", "segment_count": "sum",
+        "start_chainage": "min", "end_chainage": "max",
+        "lwp_iri": "mean", "rwp_iri": "mean", "iri_value": "mean",
+        "roughness_bi": "mean", "affected_length": "sum",
+        "total_length": "sum", "affected_length_ca": "sum", "affected_length_irc": "sum",
+    }
+    c1k_agg = c1k.groupby(gk1k, dropna=False).agg(agg_dict_parent).reset_index()
+    c1k_agg["metric_value"] = c1k_agg["roughness_bi"]
 
     # 5. Build Records Function
     def _to_table_records(pdf_data, level_name, coll_name, is_ca_only=False):
@@ -256,7 +262,7 @@ def build_roughness_linear_set(
                 "direction": first_non_null(dir_val, road_ctx.get("direction")),
                 "parent_start_chainage": p_start,
                 "parent_end_chainage": p_end,
-                "reporting_interval_m": get_reporting_interval(tracker_ctx, "roughness"),
+                "reporting_interval_m": ca_iv_m if level_name == "child_100m" else (CHILD_10M if level_name == "child_10m" else PARENT_LENGTH_M),
                 "segment_count": int(r.get("segment_count", 1) or 1),
                 "roughness_bi": bi,
                 "iri_value": iri,

@@ -94,7 +94,7 @@ TABLE_SPEC = {
     },
     "ravelling": {
         "parent": None,
-        "ca_interval_m": CHILD_100M,  # lane-wise 100m constant
+        "ca_interval_m": None,  # dynamic CA reporting interval
         "children": [("master_ravelling_10m", "10m"), ("master_ravelling", "ca")],
     },
 }
@@ -152,11 +152,13 @@ def all_tables(d: str) -> List[str]:
 
 
 def ca_iv(d: str, default_iv: Optional[int] = None) -> int:
-    """Interval of the 'ca' table: fixed in TABLE_SPEC or from survey/default."""
+    """Interval of the 'ca' table: from default_iv (D2/Tracker), spec, or fallback."""
+    if default_iv is not None:
+        return int(default_iv)
     spec_iv = TABLE_SPEC.get(d, {}).get("ca_interval_m")
     if spec_iv is not None:
         return int(spec_iv)
-    return int(default_iv) if default_iv else CHILD_100M
+    return CHILD_100M
 
 
 # ── Lane Normalization & Direction ───────────────────────────────────────────

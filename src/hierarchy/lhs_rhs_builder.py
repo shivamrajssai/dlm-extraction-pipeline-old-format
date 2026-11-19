@@ -155,14 +155,10 @@ def assign_display_defect_ids(
             if has_p.any():
                 has_p_rows = cdf[has_p].copy()
                 has_p_rows = sort_key_df(has_p_rows)
-
-                # Group by parent_id to assign 4-digit sequence
-                child_seq_list = []
-                for pid, grp in has_p_rows.groupby('parent_id', sort=False):
-                    pdid = grp['_pdid'].iloc[0]
-                    for idx, _ in enumerate(grp.itertuples()):
-                        child_seq_list.append(f"{pdid}/{idx + 1:04d}")
-                has_p_rows['display_defect_id'] = child_seq_list
+                seq_per_parent = has_p_rows.groupby('parent_id').cumcount() + 1
+                has_p_rows['display_defect_id'] = (
+                    has_p_rows['_pdid'].astype(str) + '/' + seq_per_parent.apply(lambda x: f"{x:04d}")
+                )
             else:
                 has_p_rows = pd.DataFrame(columns=cdf.columns)
 

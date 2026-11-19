@@ -60,6 +60,7 @@ def build_rutting_linear_set(
     run_date: date,
     ca_rut_threshold: float,
     irc_rut_threshold: float,
+    ca_interval_m: Optional[int] = None,
     columns: Optional[List[str]] = None,
 ) -> Dict[str, pd.DataFrame]:
     """
@@ -135,10 +136,11 @@ def build_rutting_linear_set(
             child_10m_rows.append(sub)
     child_10m_pdf = pd.DataFrame(child_10m_rows)
 
-    # 100m Aggregation
+    # CA (mid-level) Aggregation
+    ca_iv_m = int(ca_interval_m) if ca_interval_m is not None else get_reporting_interval(tracker_ctx, "rutting")
     c100 = norm_pdf.copy()
-    c100["bin_start"] = (c100["start_chainage"] // CHILD_100M) * CHILD_100M
-    c100["bin_end"] = c100["bin_start"] + CHILD_100M
+    c100["bin_start"] = (c100["start_chainage"] // ca_iv_m) * ca_iv_m
+    c100["bin_end"] = c100["bin_start"] + ca_iv_m
     gk100 = ["lane", "bin_start", "bin_end"]
     agg_dict = {
         "survey_date": "first", "start_lat": "first", "start_long": "first",
@@ -245,7 +247,7 @@ def build_rutting_linear_set(
                 "direction": first_non_null(dir_val, road_ctx.get("direction")),
                 "parent_start_chainage": p_start,
                 "parent_end_chainage": p_end,
-                "reporting_interval_m": get_reporting_interval(tracker_ctx, "rutting"),
+                "reporting_interval_m": ca_iv_m if level_name == "child_100m" else (CHILD_10M if level_name == "child_10m" else PARENT_LENGTH_M),
                 "segment_count": int(r.get("segment_count", 1) or 1),
                 "rutting_avg": rut_val,
                 "rating_ca": sev,

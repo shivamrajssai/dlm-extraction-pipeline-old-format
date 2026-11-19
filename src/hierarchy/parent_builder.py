@@ -150,6 +150,13 @@ def build_side_parent(
             rec['area_sqm'] = _sum('area_sqm')
         if 'cracking_pct' in cols:
             rec['cracking_pct'] = rec['metric_value']
+        if 'roughness_bi' in cols:
+            rec['roughness_bi'] = rec['metric_value']
+        if 'iri_value' in cols:
+            iri_vals = pd.to_numeric(g['iri_value'], errors='coerce')
+            rec['iri_value'] = round(float(iri_vals.mean()), 6) if iri_vals.notna().any() else None
+        if 'rutting_avg' in cols:
+            rec['rutting_avg'] = rec['metric_value']
 
         rows.append(rec)
 

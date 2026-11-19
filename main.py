@@ -104,10 +104,10 @@ def run_pipeline(settings: PipelineSettings) -> Dict[str, Any]:
         run_date = survey_date
     display_date_str = run_date.strftime('%d%m%y')
     ca_intervals = {
-        d: tracker_ctx.get('defect_standards', {}).get(d, {}).get('interval_m', 100)
+        d: (tracker_ctx.get('defect_standards', {}).get(d, {}).get('interval_m') or 100)
         for d in ['ravelling', 'rutting', 'cracking', 'roughness', 'pothole']
     }
-    logger.info("Display defect date prefix: %s | Survey intervals: %s", display_date_str, ca_intervals)
+    logger.info("Display defect date prefix: %s | Survey intervals (from NSV Tracker): %s", display_date_str, ca_intervals)
 
     # 2. D2 Thresholds & Standards
     logger.info("[Step 2/10] Parsing D2 Thresholds...")
@@ -185,7 +185,7 @@ def run_pipeline(settings: PipelineSettings) -> Dict[str, Any]:
     )
     crack_100m = build_cracking_agg_pdf(
         crack_10m,
-        bin_m=CHILD_100M,
+        bin_m=ca_intervals['cracking'],
         level='child_100m',
         ca_crack_pct=ca_crack_pct,
         upc=settings.upc,
@@ -215,6 +215,7 @@ def run_pipeline(settings: PipelineSettings) -> Dict[str, Any]:
         run_date=run_date,
         ca_bi_threshold=ca_bi_threshold,
         irc_iri_threshold=irc_iri_threshold,
+        ca_interval_m=ca_intervals['roughness'],
     )
     output_dfs.update(rough_sets)
 
@@ -231,6 +232,7 @@ def run_pipeline(settings: PipelineSettings) -> Dict[str, Any]:
         run_date=run_date,
         ca_rut_threshold=ca_rut_threshold,
         irc_rut_threshold=irc_rut_threshold,
+        ca_interval_m=ca_intervals['rutting'],
     )
     output_dfs.update(rut_sets)
 
@@ -247,6 +249,7 @@ def run_pipeline(settings: PipelineSettings) -> Dict[str, Any]:
         run_date=run_date,
         ca_ravelling_threshold=ca_ravel_threshold,
         irc_ravelling_threshold=irc_ravel_threshold,
+        ca_interval_m=ca_intervals['ravelling'],
     )
     output_dfs.update(ravel_sets)
 
